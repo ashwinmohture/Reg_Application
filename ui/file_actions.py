@@ -11,7 +11,7 @@ def show_file_actions(model, source, code):
     col1, col2, col3, col4, col5 = st.columns(5)
 
     explain = col1.button(
-        "🧠 Explain",
+        "🚀 Explain",
         key=f"explain_{source}"
     )
 

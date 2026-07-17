@@ -103,7 +103,7 @@ if st.session_state.current_project:
         f"Current Project : {st.session_state.current_project}"
     )
 
-st.title("🧠 CodePilot AI")
+st.title("🚀 CodePilot AI")
 
 st.caption(
     "AI-Powered Code Intelligence & Review Platform"

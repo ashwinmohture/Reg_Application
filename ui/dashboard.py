@@ -44,7 +44,7 @@ def show_dashboard():
     )
 
     col3.metric(
-        "🧠 Embedding",
+        "🚀 Embedding",
         metadata.get("embedding", "-")
     )
 
