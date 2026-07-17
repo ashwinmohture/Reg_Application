@@ -1,5 +1,5 @@
 import os
-import traceback
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -7,16 +7,42 @@ from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_mistralai import MistralAIEmbeddings
 
+from services.settings_service import get_setting
 
-# ---------------------------------------------------
-# Load Environment Variables
-# ---------------------------------------------------
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_log(level, msg):
+    """
+    Wrapper around logging calls.
+
+    Root cause of the WinError 233 crash: on Windows, Streamlit's file
+    watcher can tear down / detach the running script's stdout pipe while
+    a long blocking call (like an embedding API request) is still in
+    flight. If that happens, a later print()/log write raises
+    OSError: [WinError 233] and crashes the whole request even though the
+    "real" error (e.g. an API failure) is unrelated and already handled.
+
+    We never want a *logging* statement to be the thing that crashes the
+    app, so failures here are swallowed.
+    """
+    try:
+        logger.log(level, msg)
+    except OSError:
+        # stdout/stderr pipe is gone (Streamlit rerun/watcher race on
+        # Windows) - nothing useful we can do, just don't crash on it.
+        pass
+
 
 CURRENT_FILE = Path(__file__).resolve()
-
-# RepoMind-AI/
+# rag/embeddings.py -> rag/ -> RepoMind-AI/   (project root)
+# NOTE: previously this was CURRENT_FILE.parent.parent.parent, which points
+# one directory too high (e.g. D:\xampp\htdocs\RAG instead of
+# D:\xampp\htdocs\RAG\RepoMind-AI) and silently failed to load the .env
+# file placed at the project root, leaving GOOGLE_API_KEY / MISTRALAI_API_KEY
+# unset.
 BASE_DIR = CURRENT_FILE.parent.parent
-
 ENV_PATH = BASE_DIR / ".env"
 
 load_dotenv(
@@ -24,104 +50,79 @@ load_dotenv(
     override=True
 )
 
+if not ENV_PATH.exists():
+    _safe_log(
+        logging.WARNING,
+        f".env not found at {ENV_PATH} - API keys must be set some other way."
+    )
 
-# ---------------------------------------------------
-# Embedding Loader
-# ---------------------------------------------------
 
 def get_embedding_model():
-    """
-    Returns the best available embedding model.
-
-    Priority:
-        1. Google Gemini
-        2. Mistral
-
-    Returns:
-        Embedding Model
-    """
 
     google_key = os.getenv("GOOGLE_API_KEY")
     mistral_key = os.getenv("MISTRALAI_API_KEY")
 
-    # ---------------------------------------------------
-    # Try Google Gemini
-    # ---------------------------------------------------
+    provider = get_setting("embedding_provider")  # "auto" | "gemini" | "mistral"
 
-    if google_key:
+    # -----------------------------
+    # Try Gemini First
+    # -----------------------------
+    if google_key and provider in ("auto", "gemini"):
 
         try:
 
-            print("=" * 60)
-            print("Loading Google Gemini Embeddings...")
-            print("=" * 60)
+            _safe_log(logging.INFO, "Using Google Gemini Embeddings...")
 
             embedding = GoogleGenerativeAIEmbeddings(
                 model="models/gemini-embedding-001",
                 google_api_key=google_key
             )
 
-            # Test the API immediately
-            embedding.embed_query("Hello")
+            # Test request
+            embedding.embed_query("hello")
 
-            print("✅ Google Gemini Embeddings Loaded")
+            _safe_log(logging.INFO, "Gemini Embeddings Ready")
 
             return embedding
 
-        except Exception:
+        except Exception as e:
 
-            print("=" * 60)
-            print("❌ Failed to load Google Gemini")
-            traceback.print_exc()
-            print("=" * 60)
+            _safe_log(logging.WARNING, f"Gemini failed: {e}")
 
-    # ---------------------------------------------------
-    # Try Mistral
-    # ---------------------------------------------------
+            if provider == "gemini":
+                raise RuntimeError(
+                    f"Gemini embedding failed and provider is locked "
+                    f"to 'gemini' in Settings: {e}"
+                ) from e
 
-    if mistral_key:
+            _safe_log(logging.INFO, "Switching to Mistral...")
+
+    # -----------------------------
+    # Fallback to Mistral
+    # -----------------------------
+    if mistral_key and provider in ("auto", "mistral"):
 
         try:
-
-            print("=" * 60)
-            print("Loading Mistral Embeddings...")
-            print("=" * 60)
 
             embedding = MistralAIEmbeddings(
                 model="mistral-embed",
                 api_key=mistral_key
             )
 
-            print("✅ Mistral Embeddings Loaded")
+            embedding.embed_query("hello")
+
+            _safe_log(logging.INFO, "Mistral Embeddings Ready")
 
             return embedding
 
-        except Exception:
+        except Exception as e:
 
-            print("=" * 60)
-            print("❌ Failed to load Mistral")
-            traceback.print_exc()
-            print("=" * 60)
-
-    # ---------------------------------------------------
-    # No Provider Available
-    # ---------------------------------------------------
+            raise RuntimeError(
+                f"Mistral embedding failed: {e}"
+            ) from e
 
     raise RuntimeError(
-        "\nNo embedding provider available.\n\n"
-        "Please check:\n"
-        "1. GOOGLE_API_KEY\n"
-        "2. MISTRALAI_API_KEY\n"
-        "3. .env file location\n"
+        "No embedding provider available. "
+        "Check GOOGLE_API_KEY / MISTRALAI_API_KEY and the provider "
+        "selected in Settings."
     )
-
-
-# ---------------------------------------------------
-# Test
-# ---------------------------------------------------
-
-if __name__ == "__main__":
-
-    model = get_embedding_model()
-
-    print(model)

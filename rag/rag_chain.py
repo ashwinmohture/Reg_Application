@@ -5,8 +5,13 @@ from dotenv import load_dotenv
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
 
+from services.settings_service import get_setting
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# rag/rag_chain.py -> rag/ -> RepoMind-AI/  (project root)
+# (previously .parent.parent.parent pointed one directory too high,
+# the same bug fixed earlier in rag/embeddings.py)
+BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 
 load_dotenv(
@@ -68,7 +73,7 @@ CODE CONTEXT:
     model = ChatMistralAI(
         model="mistral-large-latest",
         api_key=api_key,
-        temperature=0.2
+        temperature=get_setting("llm_temperature")
     )
 
     prompt = prompt_template.format_messages(

@@ -1,4 +1,47 @@
+import sys
 from pathlib import Path
+
+
+class _PipeSafeStream:
+    """
+    Wraps a stream (stdout/stderr) so that write() never raises.
+
+    On Windows, Streamlit's dev-mode rerun / file watcher can tear down
+    the console pipe attached to a running script (most likely to happen
+    while a script run is mid-flight on a slow blocking call, e.g. an
+    embedding/LLM API request). Any subsequent print()/log write - ours
+    or a third-party library's - then raises:
+
+        OSError: [WinError 233] No process is on the other end of the pipe
+
+    which crashes the whole request even though it has nothing to do
+    with the actual logic that was running. This wrapper swallows that
+    specific failure mode instead of letting it propagate.
+    """
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, data):
+        try:
+            return self._stream.write(data)
+        except OSError:
+            return 0
+
+    def flush(self):
+        try:
+            self._stream.flush()
+        except OSError:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+if sys.platform == "win32":
+    sys.stdout = _PipeSafeStream(sys.stdout)
+    sys.stderr = _PipeSafeStream(sys.stderr)
+
 
 import streamlit as st
 
@@ -14,6 +57,7 @@ from ui.github import show_github_import
 from ui.security import show_security
 from ui.reports import show_reports
 from ui.workspace import show_workspace
+from ui.settings import show_settings
 
 # ==============================
 # Configuration
@@ -106,7 +150,7 @@ if st.session_state.current_project:
 st.title("🚀 CodePilot AI")
 
 st.caption(
-    "AI-Powered Code Intelligence & Review Platform"
+    "Intelligent Codebase Knowledge & Review Assistant"
 )
 
 st.divider()
@@ -140,6 +184,10 @@ elif page == "🌐 GitHub Import":
 elif page == "📈 Reports":
 
     show_reports()
+
+elif page == "⚙ Settings":
+
+    show_settings()
 
 elif not st.session_state.retriever:
 
@@ -191,10 +239,6 @@ else:
         show_security(
             st.session_state.retriever
         )
-
-    elif page == "⚙ Settings":
-
-        st.info("⚙ Settings module coming soon.")
 
     else:
 
