@@ -1,0 +1,10 @@
+streamlit
+python-dotenv
+langchain
+langchain-text-splitters
+langchain-chroma
+langchain-mistralai
+langchain-google-genai
+chromadb
+reportlab
+python-docx

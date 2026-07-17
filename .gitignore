@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+myenv/
+
+# Environment
+.env
+
+# Generated project data
+workspace/
+uploaded_projects/
+extracted_project/
+reports/
+
+# ChromaDB
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/

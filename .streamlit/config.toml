@@ -1,0 +1,8 @@
+[server]
+# Max size, in MB, for files uploaded via st.file_uploader.
+# Default is 200. Raised here to allow large project zips (e.g. 2.5GB).
+maxUploadSize = 3000
+
+# Matches maxUploadSize so WebSocket messages for large uploads
+# aren't rejected either.
+maxMessageSize = 3000
