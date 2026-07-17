@@ -199,5 +199,5 @@ else:
     else:
 
         st.info(
-            "📦 Please upload and index a project to start using RepoMind AI."
+            "📦 Please upload and index a project to start using CodePilot AI."
         )
