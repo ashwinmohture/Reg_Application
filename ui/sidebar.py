@@ -4,7 +4,7 @@ def render_sidebar():
 
     with st.sidebar:
 
-        st.title("🧠 RepoMind AI")
+        st.title("🚀 CodePilot AI")
 
         page = st.radio(
             "Navigation",

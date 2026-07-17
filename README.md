@@ -1,3 +1,3 @@
-# RepoMind AI
+# 🚀 CodePilot AI
 
 Intelligent Codebase Knowledge & Review Assistant.

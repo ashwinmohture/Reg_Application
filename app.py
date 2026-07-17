@@ -20,8 +20,8 @@ from ui.workspace import show_workspace
 # ==============================
 
 st.set_page_config(
-    page_title="RepoMind AI",
-    page_icon="🧠",
+    page_title="CodePilot AI",
+    page_icon="🚀",
     layout="wide"
 )
 
@@ -103,10 +103,10 @@ if st.session_state.current_project:
         f"Current Project : {st.session_state.current_project}"
     )
 
-st.title("🧠 RepoMind AI")
+st.title("🧠 CodePilot AI")
 
 st.caption(
-    "Intelligent Codebase Knowledge & Review Assistant"
+    "AI-Powered Code Intelligence & Review Platform"
 )
 
 st.divider()
