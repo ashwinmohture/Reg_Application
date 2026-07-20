@@ -16,7 +16,7 @@ def show_settings():
     st.subheader("⚙ Settings")
 
     st.write(
-        "Configure API keys and RAG behaviour for CodePilot AI."
+        "Configure API keys and RAG behaviour for RepoMind AI."
     )
 
     st.divider()
@@ -120,6 +120,27 @@ def show_settings():
             )
         )
 
+        requests_per_minute = st.slider(
+            "Embedding Requests / Minute",
+            min_value=10,
+            max_value=1500,
+            value=int(settings["embedding_requests_per_minute"]),
+            step=10,
+            help=(
+                "Throttles embedding calls to avoid 429 "
+                "RESOURCE_EXHAUSTED errors on large projects. "
+                "Gemini's free tier allows 100 requests/minute - keep "
+                "this at 90 or below unless you're on a paid plan. "
+                "Mistral's limits are generally higher."
+            )
+        )
+
+        st.caption(
+            "Large projects (1000+ chunks) will take longer to index "
+            "at low values, but will complete reliably instead of "
+            "failing partway through on a quota error."
+        )
+
         llm_temperature = st.slider(
             "LLM Temperature",
             min_value=0.0,
@@ -187,6 +208,7 @@ def show_settings():
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
                 "top_k": top_k,
+                "embedding_requests_per_minute": requests_per_minute,
             })
 
             st.success("Configuration saved.")

@@ -8,6 +8,8 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_mistralai import MistralAIEmbeddings
 
 from services.settings_service import get_setting
+from rag.rate_limited_embeddings import RateLimitedEmbeddings
+from rag.embedding_cache import EmbeddingCache
 
 
 logger = logging.getLogger(__name__)
@@ -57,12 +59,13 @@ if not ENV_PATH.exists():
     )
 
 
-def get_embedding_model():
+def get_embedding_model(progress_callback=None):
 
     google_key = os.getenv("GOOGLE_API_KEY")
     mistral_key = os.getenv("MISTRALAI_API_KEY")
 
     provider = get_setting("embedding_provider")  # "auto" | "gemini" | "mistral"
+    requests_per_minute = get_setting("embedding_requests_per_minute")
 
     # -----------------------------
     # Try Gemini First
@@ -78,12 +81,19 @@ def get_embedding_model():
                 google_api_key=google_key
             )
 
-            # Test request
+            # Test request (a single call - not throttled, this just
+            # verifies the key/model work before we commit to this
+            # provider for the whole bulk-embedding run).
             embedding.embed_query("hello")
 
             _safe_log(logging.INFO, "Gemini Embeddings Ready")
 
-            return embedding
+            return RateLimitedEmbeddings(
+                embedding,
+                requests_per_minute=requests_per_minute,
+                progress_callback=progress_callback,
+                cache=EmbeddingCache("gemini-embedding-001"),
+            )
 
         except Exception as e:
 
@@ -113,7 +123,12 @@ def get_embedding_model():
 
             _safe_log(logging.INFO, "Mistral Embeddings Ready")
 
-            return embedding
+            return RateLimitedEmbeddings(
+                embedding,
+                requests_per_minute=requests_per_minute,
+                progress_callback=progress_callback,
+                cache=EmbeddingCache("mistral-embed"),
+            )
 
         except Exception as e:
 

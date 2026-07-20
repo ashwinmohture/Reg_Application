@@ -1,0 +1,8 @@
+{
+    "embedding_provider": "auto",
+    "llm_temperature": 0.1,
+    "chunk_size": 750,
+    "chunk_overlap": 100,
+    "top_k": 7,
+    "embedding_requests_per_minute": 90
+}

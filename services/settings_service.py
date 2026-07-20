@@ -1,4 +1,6 @@
 # Application settings: RAG parameters + API key management
+import re
+import time
 from pathlib import Path
 import json
 import os
@@ -39,6 +41,12 @@ DEFAULT_SETTINGS = {
 
     # Retrieval
     "top_k": 5,
+
+    # Embedding request throttling - prevents 429 RESOURCE_EXHAUSTED
+    # errors on large projects. Gemini's free tier allows 100
+    # embed_content requests/minute; default is set a bit under that
+    # as a safety margin. Raise this if you're on a paid tier.
+    "embedding_requests_per_minute": 90,
 
 }
 
@@ -153,6 +161,84 @@ def mask_key(value):
     return f"{value[:4]}{'•' * 8}{value[-4:]}"
 
 
+def _set_key_manual(env_var: str, value: str):
+    """
+    Fallback writer that avoids dotenv's set_key() entirely.
+
+    set_key() writes a temp file then calls os.replace() to swap it
+    in atomically - which is the safer approach in general, but on
+    Windows os.replace() raises PermissionError/WinError 5 if
+    anything else (an editor, OneDrive, antivirus, a stray leftover
+    process) briefly has the destination file locked. Rather than
+    fail the whole save when that happens, fall back to a plain
+    read-modify-write of the file in place.
+    """
+
+    lines = []
+
+    if ENV_PATH.exists():
+
+        with open(ENV_PATH, "r", encoding="utf-8") as file:
+            lines = file.readlines()
+
+    pattern = re.compile(rf"^\s*{re.escape(env_var)}\s*=")
+    found = False
+
+    for i, line in enumerate(lines):
+
+        if pattern.match(line):
+            lines[i] = f"{env_var}={value}\n"
+            found = True
+            break
+
+    if not found:
+        lines.append(f"{env_var}={value}\n")
+
+    with open(ENV_PATH, "w", encoding="utf-8") as file:
+        file.writelines(lines)
+
+
+def _write_env_key(env_var: str, value: str, max_retries: int = 3):
+
+    last_error = None
+
+    for attempt in range(max_retries):
+
+        try:
+
+            set_key(
+                str(ENV_PATH),
+                env_var,
+                value
+            )
+
+            return
+
+        except (PermissionError, OSError) as e:
+
+            last_error = e
+            # Brief pause - most Windows file locks (editor autosave,
+            # antivirus scan, OneDrive sync) release within a second.
+            time.sleep(0.4 * (attempt + 1))
+
+    # dotenv's atomic write kept failing - fall back to a direct
+    # in-place write, which doesn't need the os.replace() step that
+    # was getting blocked.
+    try:
+
+        _set_key_manual(env_var, value)
+
+    except OSError as e:
+
+        raise PermissionError(
+            f"Could not write {env_var} to {ENV_PATH}. The file may "
+            f"be open in another program, marked read-only, or "
+            f"locked by antivirus/OneDrive sync. Close any programs "
+            f"that have .env open, make sure it isn't read-only, and "
+            f"try again. Original error: {last_error or e}"
+        ) from e
+
+
 def save_api_keys(**keys):
     """
     Writes provided keys to .env and refreshes os.environ immediately,
@@ -174,11 +260,7 @@ def save_api_keys(**keys):
 
         env_var, _label = MANAGED_KEYS[field]
 
-        set_key(
-            str(ENV_PATH),
-            env_var,
-            value
-        )
+        _write_env_key(env_var, value)
 
         os.environ[env_var] = value
 

@@ -69,10 +69,21 @@ def show_code_explorer(project_path):
 
         file_names.append(relative)
 
+    if not file_names:
+
+        st.info(
+            f"No files match '{search}'." if search
+            else "No files found."
+        )
+        return
+
     selected = st.selectbox(
         "Repository Files",
         file_names
     )
+
+    if not selected:
+        return
 
     selected_file = (
         project_path /

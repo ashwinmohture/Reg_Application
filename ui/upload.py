@@ -88,8 +88,27 @@ def show_upload(upload_dir, extract_dir):
             # Split documents
             chunks = split_code_documents(documents)
 
-            # Embeddings
-            embedding_model = get_embedding_model()
+            # Embeddings - throttled to stay under the provider's
+            # rate limit, so large projects don't hit 429
+            # RESOURCE_EXHAUSTED. embed_documents() runs during
+            # create_vector_store() below and can take a while for
+            # big codebases, so show real progress instead of a
+            # frozen spinner.
+            progress_bar = st.progress(
+                0,
+                text="Preparing to embed code chunks..."
+            )
+
+            def _on_embed_progress(done, total):
+
+                progress_bar.progress(
+                    done / total,
+                    text=f"Embedding chunks... {done}/{total}"
+                )
+
+            embedding_model = get_embedding_model(
+                progress_callback=_on_embed_progress
+            )
 
             # Release previous retriever / vector store references so the
             # old chroma.sqlite3 file handle isn't still open when we try
@@ -107,6 +126,8 @@ def show_upload(upload_dir, extract_dir):
             retriever = create_retriever(
                 vector_store
             )
+
+            progress_bar.empty()
 
             files = len(documents)
             chunk_count = len(chunks)
