@@ -221,3 +221,5 @@ class RateLimitedEmbeddings(Embeddings):
     def embed_query(self, text):
 
         return self._embed_one(text)
+    
+    
